@@ -6,7 +6,7 @@ from argparse import ArgumentParser, Namespace
 
 from cytomine.cytomine_job import _software_params_to_argparse, CytomineJob
 
-from neubiaswg5.helpers.util import check_field
+from biaflows.helpers.util import check_field
 
 
 def get_discipline(nj, default):

@@ -25,7 +25,7 @@ from os import walk
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from neubiaswg5.metrics import computemetrics, computemetrics_batch
+from biaflows.metrics import computemetrics, computemetrics_batch
 
 
 class TestComputeMetrics(TestCase):

@@ -6,9 +6,9 @@ from collections import defaultdict
 from cytomine import CytomineJob
 from cytomine.models import Project
 
-from neubiaswg5 import CLASS_TRETRC, CLASS_OBJTRK
-from neubiaswg5.helpers.cytomine_metrics import MetricCollection, get_metric_result_collection, get_metric_result
-from neubiaswg5.metrics import computemetrics_batch
+from biaflows import CLASS_TRETRC, CLASS_OBJTRK
+from biaflows.helpers.cytomine_metrics import MetricCollection, get_metric_result_collection, get_metric_result
+from biaflows.metrics import computemetrics_batch
 
 
 def get_compute_mode(problemclass):

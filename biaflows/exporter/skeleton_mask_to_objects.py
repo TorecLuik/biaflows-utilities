@@ -2,7 +2,7 @@ from skimage import morphology
 import numpy as np
 from skimage.io import imsave
 
-from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d
+from biaflows.exporter import mask_to_objects_2d, mask_to_objects_3d
 
 
 def skeleton_mask_to_objects_2d(mask, background=0, offset=None):

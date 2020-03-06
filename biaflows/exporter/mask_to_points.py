@@ -3,8 +3,8 @@ from itertools import groupby
 import numpy as np
 from shapely.geometry import Point, box
 
-from neubiaswg5.exporter import AnnotationSlice
-from neubiaswg5.exporter.export_util import draw_slice
+from biaflows.exporter import AnnotationSlice
+from biaflows.exporter.export_util import draw_slice
 
 
 def mask_to_points_2d(mask, points=True):

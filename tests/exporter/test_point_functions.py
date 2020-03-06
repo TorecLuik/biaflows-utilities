@@ -4,8 +4,8 @@ import numpy as np
 from unittest import TestCase
 from shapely.geometry import Point, Polygon, box
 
-from neubiaswg5.exporter import mask_to_points_2d, csv_to_points, AnnotationSlice, slices_to_mask
-from neubiaswg5.exporter.mask_to_points import mask_to_points_3d
+from biaflows.exporter import mask_to_points_2d, csv_to_points, AnnotationSlice, slices_to_mask
+from biaflows.exporter.mask_to_points import mask_to_points_3d
 
 
 class TestMaskToPoints(TestCase):

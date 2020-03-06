@@ -3,7 +3,7 @@ from PIL.Image import fromarray
 from PIL.ImageDraw import ImageDraw
 from shapely.geometry import Polygon, Point
 
-from neubiaswg5.exporter.export_util import draw_poly
+from biaflows.exporter.export_util import draw_poly
 
 
 def draw_square(image, side, center, color):

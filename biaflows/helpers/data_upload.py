@@ -12,10 +12,10 @@ from cytomine.models.track import Track, TrackCollection
 from shapely.geometry import LineString
 from sldc import DefaultTileBuilder, SemanticMerger
 
-from neubiaswg5.exporter.mask_to_points import mask_to_points_3d
-from neubiaswg5.helpers.util import BiaflowsSldcImage, BiaflowsTile
-from neubiaswg5.problemclass import *
-from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
+from biaflows.exporter.mask_to_points import mask_to_points_3d
+from biaflows.helpers.util import BiaflowsSldcImage, BiaflowsTile
+from biaflows.problemclass import *
+from biaflows.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
     slices_to_mask, mask_to_points_2d, skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
 from shapely.affinity import affine_transform
 

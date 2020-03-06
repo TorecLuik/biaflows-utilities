@@ -3,11 +3,11 @@ from unittest import TestCase
 import numpy as np
 from skimage.io import imsave
 
-from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, representative_point
+from biaflows.exporter import mask_to_objects_2d, mask_to_objects_3d, representative_point
 from shapely.geometry import Polygon, box, LineString
 
-from neubiaswg5.exporter.export_util import draw_linestring
-from neubiaswg5.exporter.skeleton_mask_to_objects import skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
+from biaflows.exporter.export_util import draw_linestring
+from biaflows.exporter.skeleton_mask_to_objects import skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
 from tests.exporter.util import draw_square_by_corner, draw_poly
 
 

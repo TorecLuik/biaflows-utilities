@@ -7,9 +7,9 @@ from cytomine import CytomineJob
 from cytomine.models import ImageInstanceCollection, AttachedFileCollection
 from sldc import TileTopology, DefaultTileBuilder
 
-from neubiaswg5 import CLASS_OBJTRK, CLASS_TRETRC
-from neubiaswg5.helpers.data_upload import imwrite
-from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, BiaflowsCytomineInput, \
+from biaflows import CLASS_OBJTRK, CLASS_TRETRC
+from biaflows.helpers.data_upload import imwrite
+from biaflows.helpers.util import default_value, makedirs_ifnotexists, BiaflowsCytomineInput, \
     BiaflowsFilepath, BiaflowsAttachedFile, split_filename, BiaflowsSldcImage, BiaflowsTile
 
 SUPPORTED_MULTI_EXTENSION = ["ome.tif"]
