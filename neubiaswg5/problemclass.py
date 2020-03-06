@@ -1,6 +1,6 @@
 
 """
-Neubias problem classes
+BIAflows problem classes
 """
 CLASS_OBJSEG = "ObjSeg"
 CLASS_SPTCNT = "SptCnt"

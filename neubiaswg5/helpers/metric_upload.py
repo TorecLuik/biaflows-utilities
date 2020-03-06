@@ -46,8 +46,8 @@ def upload_metrics(problemclass, nj, inputs, gt_path, out_path, tmp_path, metric
     ----------
     problemclass: str
         Problem class
-    nj: CytomineJob|NeubiasJob
-        A CytomineJob or NeubiasJob instance.
+    nj: CytomineJob|BiaflowsJob
+        A CytomineJob or BiaflowsJob instance.
     inputs: iterable
         A list of input data for which the metrics must be computed
     gt_path: str

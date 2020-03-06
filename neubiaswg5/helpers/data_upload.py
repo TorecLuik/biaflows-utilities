@@ -13,7 +13,7 @@ from shapely.geometry import LineString
 from sldc import DefaultTileBuilder, SemanticMerger
 
 from neubiaswg5.exporter.mask_to_points import mask_to_points_3d
-from neubiaswg5.helpers.util import NeubiasSldcImage, NeubiasTile
+from neubiaswg5.helpers.util import BiaflowsSldcImage, BiaflowsTile
 from neubiaswg5.problemclass import *
 from neubiaswg5.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
     slices_to_mask, mask_to_points_2d, skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
@@ -266,7 +266,7 @@ def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upl
     Parameters
     ----------
     out_path: str
-    in_image: NeubiasCytomineInput
+    in_image: BiaflowsCytomineInput
     project_id: int
     track_prefix: str
     upload_group_id: bool
@@ -289,11 +289,11 @@ def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upl
 def extract_tiled_annotations(in_tiles, out_path, nj, label_merging=False):
     """
     in_images: iterable
-        List of NeubiasTile
+        List of BiaflowsTile
     out_path: str
         Path of output tiles
-    nj: NeubiasJob
-        A neubias job object
+    nj: BiaflowsJob
+        A BIAflows job object
     label_merging: bool
         True for merging only polygons having the same label. False for merging based on geometry only
     """
@@ -307,7 +307,7 @@ def extract_tiled_annotations(in_tiles, out_path, nj, label_merging=False):
     for tiles in grouped_tiles.values():
         # recreate the topology
         in_image = tiles[0].in_image
-        topology = NeubiasSldcImage(in_image, is_2d=True).tile_topology(
+        topology = BiaflowsSldcImage(in_image, is_2d=True).tile_topology(
             default_tile_builder,
             max_width=nj.flags["tile_width"],
             max_height=nj.flags["tile_height"],
@@ -344,7 +344,7 @@ def extract_annotations_pixcla(out_path, in_image, project_id, track_prefix, upl
     Parameters
     ----------
     out_path: str
-    in_image: NeubiasCytomineInput
+    in_image: BiaflowsCytomineInput
     project_id: int
     track_prefix: str
     upload_group_id: bool
@@ -371,7 +371,7 @@ def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_
     Parameters:
     -----------
     out_path: str
-    in_image: NeubiasCytomineInput
+    in_image: BiaflowsCytomineInput
     project_id: int
     is_csv: bool
         True if the output data are stored in a csv file
@@ -431,7 +431,7 @@ def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upl
     Parameters:
     -----------
     out_path: str
-    in_image: NeubiasCytomineInput
+    in_image: BiaflowsCytomineInput
     project_id: int
     name_prefix: str
     upload_group_id: bool
@@ -470,7 +470,7 @@ def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upl
 def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=True, **kwargs):
     """
     out_path: str
-    in_image: NeubiasCytomineInput
+    in_image: BiaflowsCytomineInput
     project_id: int
     track_prefix: str
     upload_group_id: bool
@@ -510,7 +510,7 @@ def extract_annotations_lootrc(out_path, in_image, project_id, track_prefix, upl
     Parameters
     ----------
     out_path: str
-    in_image: NeubiasCytomineInput
+    in_image: BiaflowsCytomineInput
     project_id: int
     track_prefix: str
     upload_group_id: bool
@@ -539,8 +539,8 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=T
     ----------
     problemclass: str
         The problem class
-    nj: CytomineJob|NeubiasJob
-        The CytomineJob or NeubiasJob object. Ignored if do_export is True.
+    nj: CytomineJob|BiaflowsJob
+        The CytomineJob or BiaflowsJob object. Ignored if do_export is True.
     inputs: list
         Input data as returned by the prepare_data
     out_path: str

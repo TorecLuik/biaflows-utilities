@@ -16,7 +16,7 @@ def get_discipline(nj, default):
         return default
 
 
-class NeubiasParameter(object):
+class BiaflowsParameter(object):
     """Partially compatible with SoftwareParameter in order work with _software_params_to_argparse"""
     def __init__(self, **parameters):
         """Input names of properties should match descriptor file"""
@@ -53,7 +53,7 @@ class FakeUpdatableJob(object):
         print("Progress: {: <3d}% ... Status: {: >1} - '{}'".format(progress, str(status), statusComment))
 
 
-class NeubiasJob(object):
+class BiaflowsJob(object):
     """Equivalent of CytomineJob but that can run without a Cytomine server. Can be used with a context manager"""
     def __init__(self, flags, parameters):
         self._parameters = parameters
@@ -74,7 +74,7 @@ class NeubiasJob(object):
     @staticmethod
     def from_cli(argv, **kwargs):
         """
-        Returns a CytomineJob if interaction with Cytomine are needed. Otherwise, returns a minimal NeubiasJob
+        Returns a CytomineJob if interaction with Cytomine are needed. Otherwise, returns a minimal BiaflowsJob
         that emulates a CytomineJob (e.g. parameters access).
         """
         # Parse CytomineJob constructor parameters
@@ -180,14 +180,14 @@ class NeubiasJob(object):
             if software_desc is None or "inputs" not in software_desc:
                 raise ValueError("Cannot read 'descriptor.json' or missing 'inputs' in JSON")
 
-            parameters = [NeubiasParameter(**param) for param in software_desc["inputs"]]
+            parameters = [BiaflowsParameter(**param) for param in software_desc["inputs"]]
 
             # exclude all cytomine parameters
             # hypothesis: such parameters always start with 'cytomine' prefix
             job_parameters = [p for p in parameters if not p.name.startswith("cytomine")]
             argparse = _software_params_to_argparse(job_parameters)
             base_params, _ = argparse.parse_known_args(args=argv)
-            return NeubiasJob(vars(flags), base_params)
+            return BiaflowsJob(vars(flags), base_params)
 
     def __enter__(self):
         return self
@@ -197,5 +197,5 @@ class NeubiasJob(object):
 
 
 if __name__ == "__main__":
-    with NeubiasJob.from_cli(sys.argv[1:]) as job:
+    with BiaflowsJob.from_cli(sys.argv[1:]) as job:
         print(job.parameters)

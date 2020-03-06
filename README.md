@@ -1,27 +1,27 @@
-# Neubias-WG5 utilities
+# BIAFLOWS utilities
 
 ![version](https://img.shields.io/badge/version-0.8.0-blue.svg?maxAge=2592000)
 
-Utilities for Neubias WG5 softwares
+Utility functions for BIAFLOWS workflows.
 
 ## Running workflows locally
 
-You can run workflows without communicating with neubias
+You can run workflows without communicating with BIAflows
 
 Requirements:
 - in the workflow Dockerfile: `ADD descriptor.json /app/descriptor.json`
 
 Then run:
 ```bash
-docker run -v $LOCAL_INPUT:/data/in $LOCAL_OUTPUT:/data/out $LOCAL_GROUND_TRUTH:/data/gt -it DOCKER_TAG \
+docker run -v $LOCAL_FOLDER:/data-it DOCKER_TAG \
     (workflow parameters ...)
-    --nodownload --noexport --nometrics \
+    --local \
     --infolder /data/in \
     --outfolder /data/out \
     --gtfolder /data/gt
 ```
 
-where `$LOCAL_INPUT`, `$LOCAL_OUTPUT` and `$LOCAL_GROUND_TRUTH` are the local data folders (i.e. on your host).
+where `$LOCAL_FOLDER` is the local data folder (i.e. on your host).
 
 ## Install
 
@@ -34,20 +34,20 @@ Some installation steps have to be performed manually:
 pip install https://github.com/Cytomine-ULiege/Cytomine-python-client/archive/master.zip
 
 # install utilities
-git clone https://github.com/Neubias-WG5/neubiaswg5-utilities.git
-cd neubiaswg5-utilities
+git clone https://github.com/biaflows/biaflows-utilities.git
+cd biaflows-utilities
 pip install .
 
-# manually place binaries in path (required for using neubiaswg5.metrics subpackage)
+# manually place binaries in path (required for using biaflows.metrics subpackage)
 chmod +x bin/*
 cp bin/* /usr/bin/
 ```
 
-## `neubias.helpers`
+## `biaflows.helpers`
 
 This sections documents the three helper functions `prepare_data`, `upload_data` and `upload_metrics`.
 
-In general, the parameter `problemclass` should one of the following constants (see `neubiaswg5/problemclass.py`):
+In general, the parameter `problemclass` should one of the following constants (see `biaflows/problemclass.py`):
 
 * `CLASS_OBJSEG`: object segmentation
 * `CLASS_SPTCNT`: spot count
@@ -72,8 +72,8 @@ as string. See below for more details.
 Parameters:
 
 * `problemclass` (type: `str`): the problem class of the workflow for which the env must be setup.
-* `nj` (type: `CytomineJob|NeubiasJob`): a CytomineJob or NeubiasJob instance.
-* `gt_suffix` (type: `str`): ground truth images suffix in the Neubias project.
+* `nj` (type: `CytomineJob|BiaflowsJob`): a CytomineJob or BiaflowsJob instance.
+* `gt_suffix` (type: `str`): ground truth images suffix in the BIAflows project.
 * `base_path` (type: `str|None`): base path for data download. Defaults to the `$HOME/{nj.job.id}/`.
 * `do_download` (type: `bool`): true if data should be downloaded from a BIAFLOWS instance.
 * `infolder` (type: `str|None`): full path of the folder for input data. If None, defaults to `{base_path}/in`.
@@ -94,7 +94,7 @@ Returns:
 * `tmp_path` (type: `str`): full path to tmp data folder.
 
 
-## `neubiaswg5.exporter`
+## `biaflows.exporter`
 
 Annotation export tools.
 
@@ -122,7 +122,7 @@ See file `mask_to_points.py`:
 - 2D: `mask_to_points_2d`
 
 
-## `neubiaswg5.metrics`
+## `biaflows.metrics`
 
 
 test/metrics/test_compute_metrics.py is a sample wrapper script calling the benchmarking module (ComputeMetrics), some calls and sample images are provided.

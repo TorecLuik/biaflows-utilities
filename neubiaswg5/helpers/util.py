@@ -25,8 +25,8 @@ def split_filename(filename):
     return filename.rsplit(".", 1)
 
 
-class NeubiasInput(metaclass=ABCMeta):
-    """A neubias input is a file that is used as input of a workflow (either ground truth or actual input).
+class BiaflowsInput(metaclass=ABCMeta):
+    """A BIAflows input is a file that is used as input of a workflow (either ground truth or actual input).
     This class provides utilities methods for manipulating the input images
     instance.object allows to get the underlying input object
     instance.attached allows to get the list of files (as their filepath) attached to the input
@@ -67,7 +67,7 @@ class NeubiasInput(metaclass=ABCMeta):
         return self._attached
 
 
-class NeubiasCytomineInput(NeubiasInput):
+class BiaflowsCytomineInput(BiaflowsInput):
     def __init__(self, cytomine_model, in_path="", name_pattern="{id}.tif"):
         super().__init__(cytomine_model)
         self._in_path = in_path
@@ -90,7 +90,7 @@ class NeubiasCytomineInput(NeubiasInput):
         return "originalFilename"
 
 
-class NeubiasFilepath(NeubiasInput):
+class BiaflowsFilepath(BiaflowsInput):
     def __init__(self, filepath):
         super().__init__(filepath)
 
@@ -103,7 +103,7 @@ class NeubiasFilepath(NeubiasInput):
         return os.path.basename(self.filepath)
 
 
-class NeubiasAttachedFile(NeubiasCytomineInput):
+class BiaflowsAttachedFile(BiaflowsCytomineInput):
     def __init__(self, attached_file, in_path="", name_pattern="{filename}"):  # change default pattern
         super().__init__(attached_file, in_path, name_pattern)
 
@@ -116,7 +116,7 @@ class NeubiasAttachedFile(NeubiasCytomineInput):
 # SLDC compatible Image classes for tiling
 # ----------------------------------------
 
-class NeubiasSldcImage(sldc.Image):
+class BiaflowsSldcImage(sldc.Image):
     def __init__(self, in_image, is_2d=True):
         from .data_upload import imread
         self.in_image = in_image
@@ -140,9 +140,9 @@ class NeubiasSldcImage(sldc.Image):
         return self.image
 
 
-class NeubiasTile(NeubiasInput):
+class BiaflowsTile(BiaflowsInput):
     def __init__(self, in_image, tile_path, tile):
-        super(NeubiasTile, self).__init__(in_image.object, in_image.attached)
+        super(BiaflowsTile, self).__init__(in_image.object, in_image.attached)
         self.tile = tile
         self.in_image = in_image
         self.tile_path = tile_path

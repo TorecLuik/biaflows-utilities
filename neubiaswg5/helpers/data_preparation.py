@@ -9,8 +9,8 @@ from sldc import TileTopology, DefaultTileBuilder
 
 from neubiaswg5 import CLASS_OBJTRK, CLASS_TRETRC
 from neubiaswg5.helpers.data_upload import imwrite
-from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, NeubiasCytomineInput, \
-    NeubiasFilepath, NeubiasAttachedFile, split_filename, NeubiasSldcImage, NeubiasTile
+from neubiaswg5.helpers.util import default_value, makedirs_ifnotexists, BiaflowsCytomineInput, \
+    BiaflowsFilepath, BiaflowsAttachedFile, split_filename, BiaflowsSldcImage, BiaflowsTile
 
 SUPPORTED_MULTI_EXTENSION = ["ome.tif"]
 
@@ -46,8 +46,8 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", ignore_missing_gt=Fa
 
     Parameters
     ----------
-    nj: NeubiasJob
-        A neubias job
+    nj: BiaflowsJob
+        A biaflows job
     in_path: str
         Path for input images
     gt_path: str
@@ -70,8 +70,8 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", ignore_missing_gt=Fa
     """
     if not nj.flags["do_download"]:
         # NOTE: there might be a mismatch between batches resulting from local or BIAFLOWS-connected execution
-        in_images = [NeubiasFilepath(os.path.join(in_path, f)) for f in os.listdir(in_path)]
-        gt_images = [NeubiasFilepath(os.path.join(gt_path, f)) for f in os.listdir(gt_path)]
+        in_images = [BiaflowsFilepath(os.path.join(in_path, f)) for f in os.listdir(in_path)]
+        gt_images = [BiaflowsFilepath(os.path.join(gt_path, f)) for f in os.listdir(gt_path)]
         in_images = extract_batch(in_images, key=lambda i: i.filename, batch_size=batch_size, batch_id=batch_id)
         gt_images = extract_batch(gt_images, key=lambda i: i.filename, batch_size=batch_size, batch_id=batch_id)
         return in_images, gt_images
@@ -79,8 +79,8 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", ignore_missing_gt=Fa
     filename_pattern = "{id}.tif"
     nj.job.update(progress=1, statusComment="Downloading images (to {})...".format(in_path))
     images = ImageInstanceCollection().fetch_with_filter("project", nj.parameters.cytomine_id_project)
-    images = [NeubiasCytomineInput(i, name_pattern=filename_pattern) for i in images]
-    gt_images_to_process = [NeubiasCytomineInput(i.object) for i in images if gt_suffix in i.original_filename]
+    images = [BiaflowsCytomineInput(i, name_pattern=filename_pattern) for i in images]
+    gt_images_to_process = [BiaflowsCytomineInput(i.object) for i in images if gt_suffix in i.original_filename]
     in_images_to_process = {i.original_filename: i for i in images if gt_suffix not in i.original_filename}
 
     if batch_size > 0:
@@ -106,8 +106,8 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", ignore_missing_gt=Fa
         if in_filename not in in_images_to_process:
             raise ValueError("Missing input image '{}' for ground truth image '{}' (id:{}).".format(in_filename, gt.original_filename, gt.object.id))
         in_object = in_images_to_process[in_filename].object
-        in_images.append(NeubiasCytomineInput(in_object, in_path, filename_pattern))
-        gt_images.append(NeubiasCytomineInput(gt.object, gt_path, filename_pattern.format(id=in_object.id)))
+        in_images.append(BiaflowsCytomineInput(in_object, in_path, filename_pattern))
+        gt_images.append(BiaflowsCytomineInput(gt.object, gt_path, filename_pattern.format(id=in_object.id)))
 
     # check that all input images have a ground truth
     if (batch_size <= 0 and len(in_images_to_process) != len(in_images)) or (batch_size > 0 and batch_size != len(in_images)):
@@ -117,7 +117,7 @@ def download_images(nj, in_path, gt_path, gt_suffix="_lbl", ignore_missing_gt=Fa
                 continue
             if not ignore_missing_gt:
                 raise ValueError("Missing ground truth for input image '{}' (id:{}).".format(in_image.original_filename, in_image.object.id))
-            in_images.append(NeubiasCytomineInput(in_image.object, in_path, filename_pattern))
+            in_images.append(BiaflowsCytomineInput(in_image.object, in_path, filename_pattern))
 
     for img in (in_images + gt_images):
         img.object.download(img.filepath, override=False)
@@ -155,7 +155,7 @@ def download_attached(inputs, path, suffix="_attached", do_download=False, ignor
             # download the last file
             in_name, _ = split_filename(in_image.filename)
             _, ext = split_filename(most_recent.filename)
-            attached_file = NeubiasAttachedFile(most_recent, path, name_pattern=in_name + suffix + "." + ext)
+            attached_file = BiaflowsAttachedFile(most_recent, path, name_pattern=in_name + suffix + "." + ext)
             most_recent.download(attached_file.filepath)
         else:
             image_name = os.path.basename(image).rsplit(".")[0]
@@ -164,7 +164,7 @@ def download_attached(inputs, path, suffix="_attached", do_download=False, ignor
                 if ignore_missing_gt:
                     continue
                 raise FileNotFoundError("Missing attached file for input image '{}'.".format(image))
-            attached_file = NeubiasFilepath(os.path.join(
+            attached_file = BiaflowsFilepath(os.path.join(
                 path, "{}{}".format(attached_name, existing_extensions[attached_name])
             ))
         in_image.attached.append(attached_file)
@@ -193,13 +193,13 @@ def make_tiles(in_data, tile_path, tile_width=256, tile_height=256, tile_overlap
     """
     tiles = list()
     for in_image in in_data:
-        sldc_image = NeubiasSldcImage(in_image, is_2d=True)  # support 2D-only for now
+        sldc_image = BiaflowsSldcImage(in_image, is_2d=True)  # support 2D-only for now
         tile_builder = DefaultTileBuilder()
         topology = sldc_image.tile_topology(tile_builder, max_width=tile_width, max_height=tile_height, overlap=tile_overlap)
         for tile in topology:
-            neubias_tile = NeubiasTile(in_image, tile_path, tile)
-            imwrite(neubias_tile.filepath, tile.np_image, is_2d=True)
-            tiles.append(neubias_tile)
+            biaflows_tile = BiaflowsTile(in_image, tile_path, tile)
+            imwrite(biaflows_tile.filepath, tile.np_image, is_2d=True)
+            tiles.append(biaflows_tile)
     return tiles
 
 
@@ -223,8 +223,8 @@ def prepare_data(problemclass, nj, gt_suffix="_lbl", base_path=None, do_download
     ----------
     problemclass: str
         One of the problemclass
-    nj: CytomineJob|NeubiasJob
-        A CytomineJob or NeubiasJob instance.
+    nj: CytomineJob|BiaflowsJob
+        A CytomineJob or BiaflowsJob instance.
     gt_suffix: str
         Ground truth images suffix
     base_path: str
