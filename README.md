@@ -1,6 +1,6 @@
 # BIAFLOWS utilities
 
-![version](https://img.shields.io/badge/version-0.8.0-blue.svg?maxAge=2592000)
+![version](https://img.shields.io/badge/version-0.9.0-alpha.2-blue.svg?maxAge=2592000)
 
 Utility functions for BIAFLOWS workflows.
 
