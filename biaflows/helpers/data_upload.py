@@ -189,8 +189,11 @@ def create_tracking_from_slice_group(image, slices, slice2point, depth2slice, id
     sorted_group = sorted(slices, key=lambda s: s.time)
     prev_line = []
     for _slice in sorted_group:
-        if len(prev_line) == 0 or not prev_line[-1].equals(_slice.polygon):
-            prev_line.append(slice2point(_slice))
+        point = slice2point(_slice)
+        if point.is_empty:  # skip empty points
+            continue
+        if len(prev_line) == 0 or not prev_line[-1].equals(point):
+            prev_line.append(point)
 
         if len(prev_line) == 1:
             polygon = slice2point(_slice)
