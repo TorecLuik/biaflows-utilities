@@ -89,6 +89,17 @@ def fix_geometry(geometry):
         return None
 
 
+def flatten_geoms(geoms):
+    """Flatten (possibly nested) multipart geometry."""
+    geometries = []
+    for g in geoms:
+        if hasattr(g, "geoms"):
+            geometries.extend(flatten_geoms(g))
+        else:
+            geometries.append(g)
+    return geometries
+
+
 def representative_point(polygon, mask, label, offset=None):
     """ Extract a representative point with integer coordinates from the given polygon and the label image.
     Parameters
@@ -138,7 +149,7 @@ def representative_point(polygon, mask, label, offset=None):
     raise ValueError("could not find a representative point for pol")
 
 
-def mask_to_objects_2d(mask, background=0, offset=None):
+def mask_to_objects_2d(mask, background=0, offset=None, flatten_collection=True):
     """Convert 2D (binary or label) mask to polygons. Generates borders fitting in the objects.
 
     Parameters
@@ -149,6 +160,8 @@ def mask_to_objects_2d(mask, background=0, offset=None):
         Value used for encoding background pixels.
     offset: tuple (optional, default: None)
         (x, y) coordinate offset to apply to all the extracted polygons.
+    flatten_collection: bool
+        True for flattening geometry collections into individual geometries.
 
     Returns
     -------
@@ -164,11 +177,18 @@ def mask_to_objects_2d(mask, background=0, offset=None):
     slices = list()
     for gjson, label in shapes(mask.copy(), mask=exclusion, transform=affine):
         polygon = shape(gjson)
+
+        # fixing polygon
         if not polygon.is_valid:  # attempt to fix
             polygon = fix_geometry(polygon)
         if not polygon.is_valid:  # could not be fixed
             continue
-        slices.append(AnnotationSlice(polygon=polygon, label=int(label)))
+
+        if not hasattr(polygon, "geoms") or not flatten_collection:
+            slices.append(AnnotationSlice(polygon=polygon, label=int(label)))
+        else:
+            for curr in flatten_geoms(polygon.geoms):
+                slices.append(AnnotationSlice(polygon=curr, label=int(label)))
     return slices
 
 
