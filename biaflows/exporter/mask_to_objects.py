@@ -228,7 +228,7 @@ def mask_to_objects_3d(mask, background=0, offset=None, assume_unique_labels=Fal
     offset_xy = offset[:2]
     offset_z = offset[-1]
     objects = defaultdict(list)  # maps object label with list of slices (as object_3d_type objects)
-    image_box = box(offset[0], offset[1], offset[0] + mask.shape[1] - 1, offset[1] + mask.shape[1] - 1)
+    image_box = box(offset[0], offset[1], offset[0] + mask.shape[1] - 1, offset[1] + mask.shape[0] - 1)
     for d in range(depth):
         slice_objects = mask_to_objects_2d(label_img[:, :, d].copy(), background, offset=offset_xy)
         for slice_object in slice_objects:
