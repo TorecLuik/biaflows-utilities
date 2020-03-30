@@ -1,7 +1,5 @@
 # BIAFLOWS utilities
 
-![version](https://img.shields.io/badge/version-0.8.9-blue.svg?maxAge=2592000)
-
 Utility functions for BIAFLOWS workflows.
 
 ## Running workflows locally
