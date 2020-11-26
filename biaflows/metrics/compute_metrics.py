@@ -185,6 +185,8 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         metric_names = ["DC", "AHD"]
         metrics_dict.update({name: value for name, value in zip(metric_names, bchmetrics)})
+        # Remove Visceral output file
+        os.system("rm "+tmpfolder+"/metrics.xml"+" > nul 2>&1")
 
         metrics_dict["FOVL"] = float(fraction_overlap(image_gt, image_out))
 
