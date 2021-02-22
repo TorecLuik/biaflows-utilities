@@ -315,7 +315,7 @@ def extract_tiled_annotations(in_tiles, out_path, nj, label_merging=False):
         label = -1
         for tile in tiles:
             out_tile_path = os.path.join(out_path, tile.filename)
-            slices = mask_to_objects_2d(imread(out_tile_path), offset=tile.tile.abs_offset)
+            slices = mask_to_objects_2d(imread(out_tile_path), offset=tile.tile.abs_offset[::-1])
             ids.append(tile.tile.identifier)
             polygons.append([s.polygon for s in slices])
             labels.append([s.label for s in slices])
@@ -471,8 +471,8 @@ def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, upl
     """
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data, dimorder = imread(path, return_order=True)
-    ndim = data.ndim - (0 if "C" in dimorder else 1)
+    data, dimorder, _ = imread(path, return_order=True)
+    ndim = data.ndim - (1 if "C" in dimorder else 0)
 
     if ndim < 3:
         raise ValueError("Object tracking should be at least 3D (only {} spatial dimension(s) found)".format(ndim))
