@@ -37,6 +37,9 @@ class AnnotationSlice(object):
     def depth(self):
         return self._depth
 
+    def __repr__(self):
+        return "{}(poly={}, depth={}, time={}, label={})".format(self.__class__.__name__, self.polygon, self.depth, self.time, self.label)
+
 
 def clamp(x, l, h):
     return max(l, min(h, x))
@@ -107,27 +110,27 @@ def representative_point(polygon, mask, label, offset=None):
     polygon: Polygon
         A polygon
     mask: ndarray
-        The label mask from which the polygon was generated
+        The label mask from which the polygon was generated. Dim order: (..., y, x)
     label: int
         The label associated with the polygon
     offset: tuple
-        An (x, y) offset that was applied to polygon
+        An (y, x) offset that was applied to polygon
 
     Returns
     -------
     point: tuple
-        The representative point (x, y)
+        The representative point (y, x)
     """
     if offset is None:
         offset = (0, 0)
     rpoint = polygon.representative_point()
-    h, w = mask.shape[:2]
-    x = clamp(int(rpoint.x) - offset[0], 0, w - 1)
-    y = clamp(int(rpoint.y) - offset[1], 0, h - 1)
+    h, w = mask.shape[-2:]
+    x = clamp(int(rpoint.x) - offset[1], 0, w - 1)
+    y = clamp(int(rpoint.y) - offset[0], 0, h - 1)
 
     # check if start point is withing polygon
     if mask[y, y] == label:
-        return x, y
+        return y, x
 
     # circle around central pixel with at most 9 pixels radius
     direction = 1
@@ -136,13 +139,13 @@ def representative_point(polygon, mask, label, offset=None):
         for j in range(0, i):
             x += direction
             if 0 <= x < w and mask[y, x] == label:
-                return x, y
+                return y, x
 
         # -> y
         for j in range(0, i):
             y += direction
             if 0 <= y < h and mask[y, x] == label:
-                return x, y
+                return y, x
 
         direction *= -1
 
@@ -159,7 +162,7 @@ def mask_to_objects_2d(mask, background=0, offset=None, flatten_collection=True)
     background: int
         Value used for encoding background pixels.
     offset: tuple (optional, default: None)
-        (x, y) coordinate offset to apply to all the extracted polygons.
+        (y, x) coordinate offset to apply to all the extracted polygons.
     flatten_collection: bool
         True for flattening geometry collections into individual geometries.
 
@@ -173,7 +176,7 @@ def mask_to_objects_2d(mask, background=0, offset=None, flatten_collection=True)
     if offset is None:
         offset = (0, 0)
     exclusion = np.logical_not(mask == background)
-    affine = Affine(1, 0, offset[0], 0, 1, offset[1])
+    affine = Affine(1, 0, offset[1], 0, 1, offset[0])
     slices = list()
     for gjson, label in shapes(mask.copy(), mask=exclusion, transform=affine):
         polygon = shape(gjson)
@@ -198,11 +201,11 @@ def mask_to_objects_3d(mask, background=0, offset=None, assume_unique_labels=Fal
     Parameters
     ----------
     mask: ndarray
-        3D mask array. Expected shape: (width, height, depth|time).
+        3D mask array. Expected shape: (depth|time, height, width).
     background: int
         Value used for encoding background pixels.
     offset: tuple (optional, default (0, 0, 0))
-        A (x, y, z) offset to apply to all the detected objects.
+        A (z, y, x) offset to apply to all the detected objects.
     assume_unique_labels: bool
         True if each objects is encoded with a unique label in the mask.
     time: bool
@@ -224,16 +227,16 @@ def mask_to_objects_3d(mask, background=0, offset=None, assume_unique_labels=Fal
         label_img = label_fn(mask, connectivity=2, background=background)
 
     # extract slice per slice
-    depth = mask.shape[-1]
-    offset_xy = offset[:2]
-    offset_z = offset[-1]
+    depth = mask.shape[0]
+    offset_yx = offset[1:]
+    offset_z = offset[0]
     objects = defaultdict(list)  # maps object label with list of slices (as object_3d_type objects)
     for d in range(depth):
-        slice_objects = mask_to_objects_2d(label_img[:, :, d].copy(), background, offset=offset_xy)
+        slice_objects = mask_to_objects_2d(label_img[d, :, :].copy(), background, offset=offset_yx)
         for slice_object in slice_objects:
             label = slice_object.label
             if not assume_unique_labels:
-                x, y = representative_point(slice_object.polygon, label_img, slice_object.label, offset)
+                y, x = representative_point(slice_object.polygon, label_img, slice_object.label, offset)
                 label = mask[y, x]
             objects[label].append(AnnotationSlice(
                 polygon=slice_object.polygon,
@@ -250,11 +253,11 @@ def mask_to_objects_3dt(mask, background=0, offset=None):
     Parameters
     ----------
     mask: ndarray
-        4D mask array. Expected shape: (time, height, width, depth).
+        4D mask array. Expected shape: (time, depth, height, width).
     background: int
         Value used for encoding background pixels.
     offset: tuple (optional, default (0, 0, 0, 0))
-        A (t, x, y, z) offset to apply to all the detected objects.
+        A (t, z, y, x) offset to apply to all the detected objects.
 
     Returns
     -------
@@ -302,14 +305,14 @@ def mask_to_objects_3dt(mask, background=0, offset=None):
     if mask.ndim != 4:
         raise ValueError("Cannot handle image with ndim different from 4 ({} dim. given).".format(mask.ndim))
     duration = mask.shape[0]
-    offset_xyz = offset[1:]
+    offset_zyx = offset[1:]
     offset_t = offset[0]
     objects = defaultdict(list)
     for t in range(duration):
         time_objects = mask_to_objects_3d(
             mask[t],
             background=background,
-            offset=offset_xyz,
+            offset=offset_zyx,
             assume_unique_labels=True,
             time=False
         )

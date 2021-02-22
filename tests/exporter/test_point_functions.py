@@ -31,22 +31,22 @@ class TestMaskToPoints(TestCase):
         self.assertTrue(slices[0].polygon.equals(box(5, 4, 7, 6)))
 
     def testSinglePoint3D(self):
-        image = np.zeros([50, 45, 55], dtype=np.int)
+        image = np.zeros([55, 50, 45], dtype=np.int)
 
         to_draw = {
             (125, (1, 1, 1)),
-            (255, (1, 44, 27))
+            (255, (27, 44, 1))
         }
 
-        for l, (y, x, z) in list(to_draw):
-            image[y, x, z] = l
+        for l, (z, y, x) in list(to_draw):
+            image[z, y, x] = l
 
         slices = mask_to_points_3d(image)
 
         self.assertEqual(len(slices), 2)
         self.assertEqual(len(slices[0]), 1)
         self.assertEqual(len(slices[1]), 1)
-        self.assertSetEqual(to_draw, {(p.label, (p.polygon.y, p.polygon.x, p.depth)) for points in slices for p in points})
+        self.assertSetEqual(to_draw, {(p.label, (p.depth, p.polygon.y, p.polygon.x)) for points in slices for p in points})
 
 
 class TestCsvToPoints(TestCase):

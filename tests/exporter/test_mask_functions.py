@@ -26,7 +26,7 @@ class TestMaskToObject2D(TestCase):
         image = np.zeros([300, 200], dtype=np.uint8)
         image = draw_square_by_corner(image, 100, (150, 50), color=255)
 
-        slices = mask_to_objects_2d(image, offset=(255, 320))
+        slices = mask_to_objects_2d(image, offset=(320, 255))
 
         self.assertEqual(len(slices), 1)
         self.assertEqual(slices[0].label, 255)
@@ -108,7 +108,7 @@ class TestMaskToObject2D(TestCase):
             [0, 0, 1, 0, 1, 0],
             [0, 0, 0, 1, 0, 0],
             [0, 0, 0, 0, 0, 0]
-        ])
+        ], dtype=np.uint8)
         p1 = Polygon([(1, 1), (1, 2), (2, 2), (2, 3), (3, 3), (3, 1), (1, 1)])
         p2 = Polygon([(4, 1), (4, 3), (5, 3), (5, 2), (6, 2), (6, 1), (4, 1)])
         p3 = Polygon([(3, 3), (3, 4), (4, 4), (4, 3), (3, 3)])
@@ -123,7 +123,7 @@ class TestMaskToObject2D(TestCase):
             [0, 0, 0, 0],
             [0, 1, 1, 0],
             [0, 0, 0, 0]
-        ])
+        ], dtype=np.uint8)
         polygon = Polygon([(1, 1), (1, 2), (3, 2), (3, 1), (1, 1)])
         slices = mask_to_objects_2d(mask)
         self.assertEqual(len(slices), 1)
@@ -134,16 +134,17 @@ class TestMaskToObject2D(TestCase):
         image = draw_square_by_corner(image, 50, (150, 50), color=255)
         slices = mask_to_objects_2d(image)
 
-        x, y = representative_point(slices[0].polygon, image, label=255)
+        y, x = representative_point(slices[0].polygon, image, label=255)
         self.assertEqual(image[y, x], 255)
+
 
 class TestMaskToObject3D(TestCase):
     def testTwoObjectsOneSpanning(self):
-        image = np.zeros([100, 200, 3], dtype=np.uint8)
-        image[:, :, 0] = draw_square_by_corner(image[:, :, 0], 10, (5, 10), 100)
-        image[:, :, 1] = draw_square_by_corner(image[:, :, 1], 10, (5, 10), 100)
-        image[:, :, 2] = draw_square_by_corner(image[:, :, 2], 12, (5, 10), 100)
-        image[:, :, 1] = draw_square_by_corner(image[:, :, 1], 25, (45, 40), 200)
+        image = np.zeros([3, 100, 200], dtype=np.uint8)
+        image[0, :, :] = draw_square_by_corner(image[0, :, :], 10, (5, 10), 100)
+        image[1, :, :] = draw_square_by_corner(image[1, :, :], 10, (5, 10), 100)
+        image[2, :, :] = draw_square_by_corner(image[2, :, :], 12, (5, 10), 100)
+        image[1, :, :] = draw_square_by_corner(image[1, :, :], 25, (45, 40), 200)
         slices = mask_to_objects_3d(image, assume_unique_labels=True)
 
         self.assertIsInstance(slices, list)
@@ -181,14 +182,13 @@ class TestSkeletonMaskToObject(TestCase):
 
     def testSkeletonMask3D(self):
         image = np.zeros([40, 40, 40], dtype=np.uint8)
-        image[20, :, :] = draw_linestring(image[20, :, :], LineString([(5, 5), (25, 25)]))
-        image[:, 25, :] = draw_linestring(image[:, 25, :], LineString([(5, 5), (25, 25)]), color=127)
-        image[:, :, 30] = draw_linestring(image[:, :, 30], LineString([(5, 5), (25, 25)]), color=63)
+        image[30, :, :] = draw_linestring(image[30, :, :], LineString([(5, 5), (25, 25)]), color=63)
+        image[:, 20, :] = draw_linestring(image[:, 20, :], LineString([(5, 5), (25, 25)]))
+        image[:, :, 25] = draw_linestring(image[:, :, 25], LineString([(5, 5), (25, 25)]), color=127)
         slices = skeleton_mask_to_objects_3d(image, assume_unique_labels=True)
         self.assertEqual(3, len(slices))
 
         slices = sorted(slices, key=lambda s: s[0].label)
-
         self.assertEqual(1, len(slices[0]))
         self.assertEqual(63, slices[0][0].label)
         self.assertEqual(21, len(slices[1]))
@@ -198,7 +198,7 @@ class TestSkeletonMaskToObject(TestCase):
 
     def testSkeletonMask3DProjection(self):
         image = np.zeros([30, 30, 30], dtype=np.uint8)
-        image[:, :, 15] = draw_linestring(image[:, :, 15], LineString([(5, 5), (25, 25)]))
+        image[15, :, :] = draw_linestring(image[15, :, :], LineString([(5, 5), (25, 25)]))
         slices = skeleton_mask_to_objects_3d(image, assume_unique_labels=True, projection=3)
         self.assertEqual(1, len(slices))
         self.assertEqual(7, len(slices[0]))
