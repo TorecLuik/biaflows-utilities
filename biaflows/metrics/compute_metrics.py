@@ -193,7 +193,7 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
 
         metrics_dict["FOVL"] = float(fraction_overlap(image_gt, image_out))
 
-        dsb_metrics = pd.DataFrame(columns=["Image", "Threshold", "F1", "Jaccard", "TP", "FP", "FN", "Official_Score", "Precision", "Recall"])
+        dsb_metrics = pd.DataFrame(columns=["Image", "Threshold", "F1", "Jaccard", "TP", "FP", "FN", "Official_Score", "Precision", "Recall"], dtype=np.float32)
         dsb_metrics = compute_af1_results(image_gt, image_out, dsb_metrics, os.path.basename(infile))
         metrics_dict["mAP"] = dsb_metrics['Official_Score'].mean()
 
