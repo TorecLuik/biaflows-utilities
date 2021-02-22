@@ -1,8 +1,54 @@
 import os
+import tifffile
+import numpy as np
 from abc import ABCMeta, abstractmethod
 
 import sldc
 from cytomine.models._utilities import resolve_pattern
+
+
+def get_ome_metadata(tiff):
+    import xml.etree.ElementTree as ET
+    tree = ET.fromstring(tiff.ome_metadata)
+    return list(list(tree)[0])[0].attrib
+
+
+def imread_tifffile(image, np_dim_order="TZYXC", return_order=False):
+    array = image.asarray().squeeze()
+    if not image.is_ome or np_dim_order is None:
+        # no metadata, so assume order 'TZYXC'
+        return array
+    metadata = get_ome_metadata(image)
+    in_dim_order = metadata["DimensionOrder"][::-1]  # revert order so that it matches assarray
+    dim_set = {"C", "X", "Y", "Z", "T"}
+    non_empty_dim_set = {d for d in dim_set if int(metadata["Size{}".format(d)]) > 1}
+    in_dim_order = "".join([d for d in in_dim_order if d in non_empty_dim_set])
+    full_order = np_dim_order
+    np_dim_order = "".join([d for d in np_dim_order if d in non_empty_dim_set])
+    if in_dim_order == np_dim_order:
+        final = array
+    else:
+        in_dim_idx = {d: i for i, d in enumerate(in_dim_order)}
+        final = np.moveaxis(array, np.array([in_dim_idx[d] for d in np_dim_order]), np.arange(array.ndim))
+    if return_order:
+        return final, np_dim_order, full_order
+    else:
+        return final
+
+
+def imread(filepath, np_dim_order="TZYXC", return_order=False):
+    """Load image as an array and make sure dimensions are ordered as specified"""
+    return imread_tifffile(tifffile.TiffFile(filepath), np_dim_order=np_dim_order, return_order=return_order)
+
+
+def imwrite_ome(path, image, SizeC=1, SizeX=1, SizeY=1, SizeT=1, SizeZ=1, DimensionOrder="CXYZT", **metadata):
+    meta = {
+        **metadata,
+        "SizeC": SizeC, "SizeX": SizeX, "SizeY": SizeY,
+        "SizeT": SizeT, "SizeZ": SizeZ,
+        "DimensionOrder": DimensionOrder
+    }
+    tifffile.imwrite(path, image, ome=True, metadata=meta)
 
 
 def default_value(v, default):

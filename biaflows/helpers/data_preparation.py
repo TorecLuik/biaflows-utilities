@@ -8,7 +8,7 @@ from cytomine.models import ImageInstanceCollection, AttachedFileCollection
 from sldc import TileTopology, DefaultTileBuilder
 
 from biaflows import CLASS_OBJTRK, CLASS_TRETRC
-from biaflows.helpers.data_upload import imwrite
+from biaflows.helpers.data_upload import imwrite_ome
 from biaflows.helpers.util import default_value, makedirs_ifnotexists, BiaflowsCytomineInput, \
     BiaflowsFilepath, BiaflowsAttachedFile, split_filename, BiaflowsSldcImage, BiaflowsTile
 
@@ -198,7 +198,7 @@ def make_tiles(in_data, tile_path, tile_width=256, tile_height=256, tile_overlap
         topology = sldc_image.tile_topology(tile_builder, max_width=tile_width, max_height=tile_height, overlap=tile_overlap)
         for tile in topology:
             biaflows_tile = BiaflowsTile(in_image, tile_path, tile)
-            imwrite(biaflows_tile.filepath, tile.np_image, is_2d=True)
+            imwrite_ome(biaflows_tile.filepath, tile.np_image, sizeX=tile.width, sizeY=tile.height, sizeC=tile.channels)
             tiles.append(biaflows_tile)
     return tiles
 

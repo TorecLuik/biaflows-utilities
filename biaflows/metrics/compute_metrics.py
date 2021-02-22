@@ -23,18 +23,14 @@
 import os
 import re
 import shutil
-import sys
-import subprocess
+import numpy as np
 
 from skimage import measure
 from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
-from sklearn.metrics import confusion_matrix
-import numpy as np
 from scipy import ndimage, stats
-import tifffile as tiff
 from scipy.spatial import cKDTree
 import pandas as pd
 from biaflows import *
@@ -44,8 +40,7 @@ from .img_to_seq import *
 from .swc2obj import *
 from .skl2obj import *
 from .netmets_obj import netmets_obj
-from .node_sorter import swc_node_sorter
-from .node_sorter import findchildren
+from ..helpers.util import get_ome_metadata
 
 
 def computemetrics_batch(infiles, reffiles, problemclass, tmpfolder, verbose=True, **extra_params):
@@ -81,11 +76,7 @@ def computemetrics(infile, reffile, problemclass, tmpfolder, verbose=True, **ext
     return outputs
 
 
-def get_image_metadata(tiff):
-    return tiff.ome_metadata['Image']['Pixels']
-
-
-def get_dimensions(tiff, time=False):
+def get_dimensions(tiff, time=False, channels=False):
     """
     Parameters
     ----------
@@ -96,22 +87,34 @@ def get_dimensions(tiff, time=False):
         If False, same applies for SizeZ and SizeT resprectively.
     :return:
     """
-    array = tiff.asarray()
-    T, Z = 1, 1
-    if array.ndim > 2:
-        metadata = get_image_metadata(tiff)
-        Y, X = int(metadata['SizeY']), int(metadata['SizeX'])
-        inT = int(metadata['SizeT']) if 'SizeT' in metadata else 1
-        inZ = int(metadata['SizeZ']) if 'SizeZ' in metadata else 1
-        if array.ndim > 3:
-            T, Z = inT, inZ
-        elif array.ndim == 3:
-            if time:
-                T = inT if inT > 1 else inZ
-            else:
-                Z = inZ if inZ > 1 else inT
+    if tiff.is_ome:
+        metadata = get_ome_metadata(tiff)
+        X = metadata.get("SizeX", 1)
+        Y = metadata.get("SizeY", 1)
+        Z = metadata.get("SizeZ", 1)
+        T = metadata.get("SizeT", 1)
+        if time and T == 1:
+            T = Z
+            Z = 1
+        elif not time and Z == 1:
+            Z = T
+            T = 1
     else:
-        Y, X = array.shape
+        chan_offset = 1 if channels else 0
+        array = tiff.asarray()
+        shape = array.shape()
+        X = shape[-1 - chan_offset]
+        Y = shape[-2 - chan_offset]
+        T, Z = 1, 1
+        if (array.ndim - chan_offset) >= 4:  # 4D
+            T = shape[-4 - chan_offset]
+            Z = shape[-3 - chan_offset]
+        elif (array.ndim - chan_offset) == 3:  # 3D
+            dim = shape[-3 - chan_offset]
+            if time:
+                T = dim
+            else:
+                Z = dim
     return T, Z, Y, X
 
 
@@ -295,16 +298,11 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         params_dict['SUBDIV'] = subdiv
 
     elif problemclass == CLASS_OBJDET:
-
-        # Read metadata from reference image (OME-TIFF)
-        img = tiff.TiffFile(reffile)
-        T, Z, Y, X = get_dimensions(img, time=False)
-
         # Convert non null pixels coordinates to track files (single time point)
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
-        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile,X,Y,Z,T), False)
+        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile), False)
         in_xml_fname = os.path.join(tmpfolder, "intracks.xml")
-        tracks_to_xml(in_xml_fname, img_to_tracks(infile,X,Y,Z,T), False)
+        tracks_to_xml(in_xml_fname, img_to_tracks(infile), False)
 
         # Call point matching metric code
         # the third parameter represents the gating distance
@@ -347,16 +345,11 @@ def _computemetrics(infile, reffile, problemclass, tmpfolder, **extra_params):
         metrics_dict['MRE'] = np.mean(MRE)
         
     elif problemclass == CLASS_PRTTRK:
-
-        # Read metadata from reference image (OME-TIFF)
-        img = tiff.TiffFile(reffile)
-        T, Z, Y, X = get_dimensions(img, time=False)
-
         # Convert non null pixels coordinates to track files
         ref_xml_fname = os.path.join(tmpfolder, "reftracks.xml")
-        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile,X,Y,Z,T), True)
+        tracks_to_xml(ref_xml_fname, img_to_tracks(reffile), True)
         in_xml_fname = os.path.join(tmpfolder, "intracks.xml")
-        tracks_to_xml(in_xml_fname, img_to_tracks(infile,X,Y,Z,T), True)
+        tracks_to_xml(in_xml_fname, img_to_tracks(infile), True)
         res_fname = in_xml_fname + ".score.txt"
 
         # Call tracking metric code

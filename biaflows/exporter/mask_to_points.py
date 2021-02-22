@@ -13,7 +13,7 @@ def mask_to_points_2d(mask, points=True):
     Parameters
     ----------
     mask: ndarray
-        The point label mask
+        The point label mask. Dim order: (y, x)
     points: bool
         Whether or not the object must be encoded as points (i.e. Point) of square polygons (i.e. 3 by 3 square Polygon)
 
@@ -38,7 +38,7 @@ def mask_to_points_3d(mask, time=False, assume_unique_labels=False):
     Parameters
     ----------
     mask: ndarray
-        The point label mask
+        The point label mask dim order (t/z, y, x)
     assume_unique_labels: bool
         True if labels represent unique objects
     time: bool
@@ -57,7 +57,7 @@ def mask_to_points_3d(mask, time=False, assume_unique_labels=False):
             label=int(label),
             time=None if not time else z,
             depth=None if time else z
-            ) for (y, x, z), label in zip(zip(*pixels), labels)
+            ) for (z, y, x), label in zip(zip(*pixels), labels)
     ]
     if assume_unique_labels:
         label_fn = lambda s: s.label

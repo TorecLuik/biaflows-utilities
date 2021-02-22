@@ -297,6 +297,8 @@ def mask_to_objects_3dt(mask, background=0, offset=None):
     -----
     Each object should be encoded with the same label over time.
     """
+    if offset is None:
+        offset = (0, 0, 0, 0)
     if mask.ndim != 4:
         raise ValueError("Cannot handle image with ndim different from 4 ({} dim. given).".format(mask.ndim))
     duration = mask.shape[0]
@@ -305,7 +307,7 @@ def mask_to_objects_3dt(mask, background=0, offset=None):
     objects = defaultdict(list)
     for t in range(duration):
         time_objects = mask_to_objects_3d(
-            mask,
+            mask[t],
             background=background,
             offset=offset_xyz,
             assume_unique_labels=True,
@@ -313,10 +315,8 @@ def mask_to_objects_3dt(mask, background=0, offset=None):
         )
         for time_slices in time_objects:
             label = time_slices[0].label
-            objects[label].append(AnnotationSlice(
-                polygon=s.polygon,
-                label=s.label,
-                depth=s.depth,
-                time=t + offset_t
-            ) for s in time_slices)
+            objects[label].append([
+                AnnotationSlice(polygon=s.polygon, label=s.label, depth=s.depth, time=t + offset_t)
+                for s in time_slices
+            ])
     return objects.values()

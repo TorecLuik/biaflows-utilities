@@ -1,29 +1,25 @@
 # A script for converting OME-TIFF labeled masks to the Particle Tracking Challenge format
-# Author: Martin Maska <xmaska@fi.muni.cz>, 2018
+# Authors: Martin Maska <xmaska@fi.muni.cz>, 2018
+#          Romain Mormont <rmormont@uliege.be>, 2021
 
-import tifffile as tiff
+import numpy as np
+from collections import defaultdict
+from biaflows.helpers.util import imread
 
-# Convert the tracking results saved in an OME-TIFF image to a dictionary of tracks
-def img_to_tracks(fname,X,Y,Z,T):
-    img = tiff.TiffFile(fname)
-    track_dict = {}
-    img_data = img.asarray().ravel()
-    for t in range(T):
-        for z in range(Z):
-            for y in range(Y):
-                for x in range(X):
-                    index = t*Z*Y*X + z*Y*X + y*X + x 
-                    val = img_data[index]
-                    if val > 0:
-                        if val not in track_dict:
-                            track_dict[val] = [[t, x, y, z]]
-                        else:
-                            track_dict[val].append([t, x, y, z])
-    
+
+def img_to_tracks(fname):
+    # Convert the tracking results saved in an OME-TIFF image to a dictionary of tracks
+    img_data, order, _ = imread(fname, return_order=True)
+    track_dict = defaultdict(list)
+    where = np.where(img_data > 0)
+    order_idx = {d: i for i, d in enumerate(order)}
+    for val, point in zip(img_data[where], zip(*where)):
+        track_dict[val].append([(point[order_idx.get(d, -1)] if d in order_idx else 0) for d in "TXYZ"])
     return track_dict
 
-# Convert the dictionary of tracks to the XML format used in the Particle Tracking Challenge
+
 def tracks_to_xml(fname, track_dict, keep_labels):
+    # Convert the dictionary of tracks to the XML format used in the Particle Tracking Challenge
     with open(fname, "w") as f:
         f.write('<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n')
         f.write('<root>\n')

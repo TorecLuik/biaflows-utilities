@@ -1,11 +1,11 @@
 import os
 import sys
+
+import tifffile
 from collections import defaultdict
 from multiprocessing import cpu_count
 
 import numpy as np
-import imageio
-from cytomine import CytomineJob
 from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, AnnotationCollection, Property
 from cytomine.models.image import SliceInstanceCollection
 from cytomine.models.track import Track, TrackCollection
@@ -13,30 +13,14 @@ from shapely.geometry import LineString
 from sldc import DefaultTileBuilder, SemanticMerger
 
 from biaflows.exporter.mask_to_points import mask_to_points_3d
-from biaflows.helpers.util import BiaflowsSldcImage, BiaflowsTile
+from biaflows.helpers.util import BiaflowsSldcImage, imread, imwrite_ome
 from biaflows.problemclass import *
 from biaflows.exporter import mask_to_objects_2d, mask_to_objects_3d, AnnotationSlice, csv_to_points, \
-    slices_to_mask, mask_to_points_2d, skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d
+    slices_to_mask, mask_to_points_2d, skeleton_mask_to_objects_2d, skeleton_mask_to_objects_3d, mask_to_objects_3dt
 from shapely.affinity import affine_transform
 
 
 DEFAULT_COLOR = "#FF0000"
-
-
-def imread(path, is_2d=True, **kwargs):
-    """wrapper for imageio.imread or imageio.volread"""
-    if is_2d:
-        return imageio.imread(path, **kwargs)
-    else:
-        return imageio.volread(path, **kwargs)
-
-
-def imwrite(path, image, is_2d=True, **kwargs):
-    """wrapper for imageio.imwrite or imageio.volwrite"""
-    if is_2d:
-        return imageio.imwrite(path, image, **kwargs)
-    else:
-        return imageio.volwrite(path, image, **kwargs)
 
 
 def change_referential(p, height):
@@ -75,16 +59,25 @@ def get_depth_to_slice(image_instance, depth='auto'):
     ----------
     image_instance: ImageInstance
         An image
-    depth: str
-        One of {'auto', 'time', 'zStack'}. Which field to read for getting the depth.
+    depth: str|tuple
+        One of {'auto', 'time', 'zStack'} or a tuple containing {'time', 'zStack'} in any order. Which field to read for getting the depth.
 
     Returns
     -------
     depth2slice: dict
+        If depth was a string, maps the depth number (time or zStack) to the SliceInstance.
+        If depth was a tuple, maps the tuple containing depth numbers in the same order as the tuple mapping the sliceinstance
     """
     slices = SliceInstanceCollection().fetch_with_filter("imageinstance", image_instance.id)
     read_zstack = lambda s: s.zStack
     read_time = lambda s: s.time
+    # map tuple to slice
+    if isinstance(depth, tuple):
+        return {
+            tuple((read_time(slice) if d == "time" else read_zstack(slice)) for d in depth): slice
+            for slice in slices
+        }
+    # map depth number to slice
     read_depth = read_zstack  # by default
     if depth is 'auto' and image_instance.duration > 1:
         read_depth = read_time
@@ -93,7 +86,7 @@ def get_depth_to_slice(image_instance, depth='auto'):
     return {read_depth(slice): slice for slice in slices}
 
 
-def create_track_from_slices(image, slices, depth2slice, id_project, track_prefix="object", label=None, upload_group_id=False):
+def create_track_from_slices(image, slices, depth2slice, id_project, track_prefix="object", label=None, upload_group_id=False, depth="time"):
     """Create an annotation track from a list of AnnotationSlice
     Parameters
     ----------
@@ -111,6 +104,8 @@ def create_track_from_slices(image, slices, depth2slice, id_project, track_prefi
         A label for the track
     upload_group_id: bool
         True to upload the group identifier
+    depth: str
+        Which depth field to read in the AnnotationSlice if both are present. One of {'time', 'depth'}.
 
     Returns
     -------
@@ -133,7 +128,7 @@ def create_track_from_slices(image, slices, depth2slice, id_project, track_prefi
             id_image=image.id,
             id_project=id_project,
             id_tracks=[track.id],
-            slice=depth2slice[_slice.depth if _slice.time is None else _slice.time].id
+            slice=depth2slice[_slice.depth if _slice.time is None or depth == "depth" else _slice.time].id
         ))
     return track, collection
 
@@ -264,7 +259,7 @@ def mask_convert(mask, image, project_id, mask_2d_fn, mask_3d_fn, track_prefix, 
     return tracks, annotations
 
 
-def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=True, **kwargs):
+def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upload_group_id=False, **kwargs):
     """
     Parameters
     ----------
@@ -274,16 +269,15 @@ def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upl
     track_prefix: str
     upload_group_id: bool
         True for uploading annotation group id
-    is_2d: bool
     kwargs: dict
     """
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data = imread(path, is_2d=is_2d)
+    data = imread(path)
     return mask_convert(
         data, image, project_id,
         mask_2d_fn=mask_to_objects_2d,
-        mask_3d_fn=lambda m: mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True),
+        mask_3d_fn=lambda m: mask_to_objects_3d(m, background=0, assume_unique_labels=True),
         track_prefix=track_prefix + "-object",
         upload_group_id=upload_group_id
     )
@@ -321,7 +315,7 @@ def extract_tiled_annotations(in_tiles, out_path, nj, label_merging=False):
         label = -1
         for tile in tiles:
             out_tile_path = os.path.join(out_path, tile.filename)
-            slices = mask_to_objects_2d(imread(out_tile_path, is_2d=True), offset=tile.tile.abs_offset)
+            slices = mask_to_objects_2d(imread(out_tile_path), offset=tile.tile.abs_offset)
             ids.append(tile.tile.identifier)
             polygons.append([s.polygon for s in slices])
             labels.append([s.label for s in slices])
@@ -342,7 +336,7 @@ def extract_tiled_annotations(in_tiles, out_path, nj, label_merging=False):
     return annotations
 
 
-def extract_annotations_pixcla(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=True, **kwargs):
+def extract_annotations_pixcla(out_path, in_image, project_id, track_prefix, upload_group_id=False, **kwargs):
     """
     Parameters
     ----------
@@ -352,16 +346,15 @@ def extract_annotations_pixcla(out_path, in_image, project_id, track_prefix, upl
     track_prefix: str
     upload_group_id: bool
         True for uploading annotation group id
-    is_2d: bool
     kwargs: dict
     """
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data = imread(path, is_2d=is_2d)
+    data = imread(path)
     return mask_convert(
         data, image, project_id,
         mask_2d_fn=mask_to_objects_2d,
-        mask_3d_fn=lambda m: mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=False),
+        mask_3d_fn=lambda m: mask_to_objects_3d(m, background=0, assume_unique_labels=False),
         track_prefix=track_prefix + "-object",
         upload_group_id=upload_group_id
     )
@@ -369,7 +362,7 @@ def extract_annotations_pixcla(out_path, in_image, project_id, track_prefix, upl
 
 def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_csv=False, generate_mask=False,
                                result_file_suffix=".tif", has_headers=False, parse_fn=None, upload_group_id=False,
-                               is_2d=True, **kwargs):
+                               **kwargs):
     """
     Parameters:
     -----------
@@ -390,7 +383,6 @@ def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_
     track_prefix: str
     upload_group_id: bool
         True for uploading annotation group id
-    is_2d: bool
     kwargs: dict
     """
     image = in_image.object
@@ -414,14 +406,15 @@ def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_
         ])
 
         if generate_mask:
-            mask = slices_to_mask(points, imread(in_image.filepath, is_2d=is_2d).shape)
-            imwrite(os.path.join(out_path, in_image.filename), mask, is_2d=is_2d)
+            mask = slices_to_mask(points, imread(in_image.filepath).shape).squeeze()
+            imwrite_ome(os.path.join(out_path, in_image.filename),
+                        mask, SizeC=1, SizeX=mask.shape[-1], SizeY=mask.shape[-2], DimensionOrder="CXYZT")
     else:
         # points stored in a mask
         tracks, annotations = mask_convert(
-            imread(path, is_2d=is_2d), image, project_id,
+            imread(path), image, project_id,
             mask_2d_fn=mask_to_points_2d,
-            mask_3d_fn=lambda m: mask_to_points_3d(np.moveaxis(m, 0, 2), time=False, assume_unique_labels=False),
+            mask_3d_fn=lambda m: mask_to_points_3d(m, time=False, assume_unique_labels=False),
             track_prefix=track_prefix + "-object",
             upload_group_id=upload_group_id
         )
@@ -429,7 +422,7 @@ def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_
     return tracks, annotations
 
 
-def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=False, **kwargs):
+def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upload_group_id=False, **kwargs):
     """
     Parameters:
     -----------
@@ -438,20 +431,17 @@ def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upl
     project_id: int
     name_prefix: str
     upload_group_id: bool
-    is_2d: bool
     kwargs: dict
     """
-    if is_2d:
-        raise ValueError("Annotation extraction function called with is_2d=True: object tracking should be at least 3D")
 
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data = imread(path, is_2d=is_2d)
+    data = imread(path)
 
     if data.ndim != 3:
         raise ValueError("Annotation extraction for object tracking does not support masks with more than 3 dims...")
 
-    slices = mask_to_points_3d(np.moveaxis(data, 0, 2), time=True, assume_unique_labels=True)
+    slices = mask_to_points_3d(data, time=True, assume_unique_labels=True)
     time_to_image = get_depth_to_slice(image)
 
     tracks = TrackCollection()
@@ -470,45 +460,71 @@ def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upl
     return tracks, annotations
 
 
-def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=True, **kwargs):
+def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, upload_group_id=False, **kwargs):
     """
     out_path: str
     in_image: BiaflowsCytomineInput
     project_id: int
     track_prefix: str
     upload_group_id: bool
-    is_2d: bool
     kwargs: dict
     """
-    if is_2d:
-        raise ValueError("Annotation extraction function called with is_2d=True: object tracking should be at least 3D")
-
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data = imread(path, is_2d=is_2d)
+    data, dimorder = imread(path, return_order=True)
+    ndim = data.ndim - (0 if "C" in dimorder else 1)
 
-    if data.ndim != 3:
-        raise ValueError("Annotation extraction for object tracking does not support masks with more than 3 dims...")
-
-    slices = mask_to_objects_3d(np.moveaxis(data, 0, 2), time=True, assume_unique_labels=True)
-    time_to_image = get_depth_to_slice(image)
+    if ndim < 3:
+        raise ValueError("Object tracking should be at least 3D (only {} spatial dimension(s) found)".format(ndim))
 
     tracks = TrackCollection()
     annotations = AnnotationCollection()
-    for slice_group in slices:
-        curr_tracks, curr_annots = create_tracking_from_slice_group(
-            image, slice_group,
-            slice2point=lambda _slice: _slice.polygon.centroid,
-            depth2slice=time_to_image, id_project=project_id,
-            upload_object=True, upload_group_id=upload_group_id,
-            track_prefix=track_prefix + "-object"
-        )
-        tracks.extend(curr_tracks)
-        annotations.extend(curr_annots)
+
+    if ndim == 3:
+        slices = mask_to_objects_3d(data, time=True, assume_unique_labels=True)
+        time_to_image = get_depth_to_slice(image)
+
+        for slice_group in slices:
+            curr_tracks, curr_annots = create_tracking_from_slice_group(
+                image, slice_group,
+                slice2point=lambda _slice: _slice.polygon.centroid,
+                depth2slice=time_to_image, id_project=project_id,
+                upload_object=True, upload_group_id=upload_group_id,
+                track_prefix=track_prefix + "-object"
+            )
+            tracks.extend(curr_tracks)
+            annotations.extend(curr_annots)
+    elif ndim == 4:
+        objects = mask_to_objects_3dt(mask=data)
+        depths_to_image = get_depth_to_slice(image, depth=("time", "depth"))
+        # TODO add tracking lines one way or another
+        for time_steps in objects:
+            label = time_steps[0][0].label
+            track = Track(name="{}-{}".format(track_prefix, label), id_image=image.id,
+                          color=None if upload_group_id else DEFAULT_COLOR).save()
+
+            if upload_group_id:
+                Property(track, key="label", value=label).save()
+
+            annotations.extend([
+                Annotation(
+                    location=change_referential(p=slice.polygon, height=image.height).wkt,
+                    id_image=image.id,
+                    id_project=project_id,
+                    id_tracks=[track.id],
+                    slice=depths_to_image[(slice.time, slice.depth)].id
+                ) for slices in time_steps for slice in slices
+            ])
+
+            tracks.append(track)
+
+    else:
+        raise ValueError("Annotation extraction for object tracking does not support masks with more than 4 dims...")
+
     return tracks, annotations
 
 
-def extract_annotations_lootrc(out_path, in_image, project_id, track_prefix, upload_group_id=False, is_2d=True, projection=0, **kwargs):
+def extract_annotations_lootrc(out_path, in_image, project_id, track_prefix, upload_group_id=False, projection=0, **kwargs):
     """
     Parameters
     ----------
@@ -517,18 +533,17 @@ def extract_annotations_lootrc(out_path, in_image, project_id, track_prefix, upl
     project_id: int
     track_prefix: str
     upload_group_id: bool
-    is_2d: bool
     projection: int
         Projection of the skeleton
     kwargs: dict
     """
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data = imread(path, is_2d=is_2d)
+    data = imread(path)
     tracks, collection = mask_convert(
         data, image, project_id,
         mask_2d_fn=skeleton_mask_to_objects_2d,
-        mask_3d_fn=lambda m: skeleton_mask_to_objects_3d(np.moveaxis(m, 0, 2), background=0, assume_unique_labels=True, projection=projection),
+        mask_3d_fn=lambda m: skeleton_mask_to_objects_3d(m, background=0, assume_unique_labels=True, projection=projection),
         track_prefix=track_prefix + "-network",
         upload_group_id=upload_group_id
     )
@@ -595,7 +610,7 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=T
                 out_path, in_image, nj.project.id,
                 track_prefix=str(nj.job.id),
                 upload_group_id=upload_group_id,
-                is_2d=is_2d, **kwargs
+                **kwargs
             )
             tracks.extend(curr_tracks)
             annotations.extend(curr_annots)
