@@ -41,14 +41,15 @@ def imread(filepath, np_dim_order="TZYXC", return_order=False):
     return imread_tifffile(tifffile.TiffFile(filepath), np_dim_order=np_dim_order, return_order=return_order)
 
 
-def imwrite_ome(path, image, SizeC=1, SizeX=1, SizeY=1, SizeT=1, SizeZ=1, DimensionOrder="CXYZT", **metadata):
-    meta = {
-        **metadata,
-        "SizeC": SizeC, "SizeX": SizeX, "SizeY": SizeY,
-        "SizeT": SizeT, "SizeZ": SizeZ,
-        "DimensionOrder": DimensionOrder
-    }
-    tifffile.imwrite(path, image, ome=True, metadata=meta)
+def imwrite_ome(filepath, array, dim_order):
+    if array.ndim != len(dim_order):
+        raise ValueError("Dimension mismatch between array ({}) and dim_order ({})".format(array.shape, dim_order))
+    expected_dim_order = "TZCYXS"
+    dim_order_map = {d: i for i, d in enumerate(dim_order)}
+    reorder_axes = [dim_order_map[d] for d in expected_dim_order if d in dim_order_map]
+    reordered = np.moveaxis(array, reorder_axes, np.arange(array.ndim))
+    reshaped = np.reshape(reordered, [(array.shape[dim_order_map.get(d)] if d in dim_order_map else 1) for d in expected_dim_order])
+    return tifffile.imwrite(filepath, reshaped, ome=True)
 
 
 def default_value(v, default):

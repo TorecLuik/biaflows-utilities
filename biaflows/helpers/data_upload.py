@@ -406,9 +406,9 @@ def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_
         ])
 
         if generate_mask:
-            mask = slices_to_mask(points, imread(in_image.filepath).shape).squeeze()
-            imwrite_ome(os.path.join(out_path, in_image.filename),
-                        mask, SizeC=1, SizeX=mask.shape[-1], SizeY=mask.shape[-2], DimensionOrder="CXYZT")
+            image, dim_order, _ = imread(in_image.filepath, return_order=True)
+            mask = slices_to_mask(points, image.shape).squeeze()
+            imwrite_ome(os.path.join(out_path, in_image.filename), mask, dim_order=dim_order)
     else:
         # points stored in a mask
         tracks, annotations = mask_convert(
