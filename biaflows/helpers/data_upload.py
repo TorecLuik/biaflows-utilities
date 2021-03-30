@@ -1,11 +1,10 @@
 import os
 import sys
+import warnings
 
-import tifffile
 from collections import defaultdict
 from multiprocessing import cpu_count
 
-import numpy as np
 from cytomine.models import Annotation, ImageInstance, ImageSequenceCollection, AnnotationCollection, Property
 from cytomine.models.image import SliceInstanceCollection
 from cytomine.models.track import Track, TrackCollection
@@ -259,7 +258,12 @@ def mask_convert(mask, image, project_id, mask_2d_fn, mask_3d_fn, track_prefix, 
     return tracks, annotations
 
 
-def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upload_group_id=False, **kwargs):
+def get_dimensionality(dims):
+    """dims: string of dimensions identifier (ex: 'XYZT')"""
+    return len([d for d in dims if d != "C"])
+
+
+def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, **kwargs):
     """
     Parameters
     ----------
@@ -267,19 +271,17 @@ def extract_annotations_objseg(out_path, in_image, project_id, track_prefix, upl
     in_image: BiaflowsCytomineInput
     project_id: int
     track_prefix: str
-    upload_group_id: bool
-        True for uploading annotation group id
     kwargs: dict
     """
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data = imread(path)
+    data, dim_order, _ = imread(path, return_order=True)
     return mask_convert(
         data, image, project_id,
         mask_2d_fn=mask_to_objects_2d,
         mask_3d_fn=lambda m: mask_to_objects_3d(m, background=0, assume_unique_labels=True),
         track_prefix=track_prefix + "-object",
-        upload_group_id=upload_group_id
+        upload_group_id=get_dimensionality(dim_order) > 2
     )
 
 
@@ -336,7 +338,7 @@ def extract_tiled_annotations(in_tiles, out_path, nj, label_merging=False):
     return annotations
 
 
-def extract_annotations_pixcla(out_path, in_image, project_id, track_prefix, upload_group_id=False, **kwargs):
+def extract_annotations_pixcla(out_path, in_image, project_id, track_prefix, **kwargs):
     """
     Parameters
     ----------
@@ -344,25 +346,22 @@ def extract_annotations_pixcla(out_path, in_image, project_id, track_prefix, upl
     in_image: BiaflowsCytomineInput
     project_id: int
     track_prefix: str
-    upload_group_id: bool
-        True for uploading annotation group id
     kwargs: dict
     """
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data = imread(path)
+    data, dim_order, _ = imread(path, return_order=True)
     return mask_convert(
         data, image, project_id,
         mask_2d_fn=mask_to_objects_2d,
         mask_3d_fn=lambda m: mask_to_objects_3d(m, background=0, assume_unique_labels=False),
         track_prefix=track_prefix + "-object",
-        upload_group_id=upload_group_id
+        upload_group_id=get_dimensionality(dim_order) > 2
     )
 
 
 def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_csv=False, generate_mask=False,
-                               result_file_suffix=".tif", has_headers=False, parse_fn=None, upload_group_id=False,
-                               **kwargs):
+                               result_file_suffix=".tif", has_headers=False, parse_fn=None, **kwargs):
     """
     Parameters:
     -----------
@@ -381,8 +380,6 @@ def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_
     parse_fn: callable
         A function for extracting coordinates from the csv file (already separated) line.
     track_prefix: str
-    upload_group_id: bool
-        True for uploading annotation group id
     kwargs: dict
     """
     image = in_image.object
@@ -396,12 +393,12 @@ def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_
         return annotations
 
     # whether the points are stored in a csv or a mask
-    if is_csv:
+    if is_csv:  # only 2d
         if parse_fn is None:
             raise ValueError("parse_fn shouldn't be 'None' when result file is a CSV.")
         points = csv_to_points(path, has_headers=has_headers, parse_fn=parse_fn)
         annotations.extend([
-            create_annotation_from_slice(point, image.id, image.height, project_id, upload_group_id=upload_group_id)
+            create_annotation_from_slice(point, image.id, image.height, project_id, upload_group_id=False)
             for point in points
         ])
 
@@ -411,18 +408,19 @@ def extract_annotations_objdet(out_path, in_image, project_id, track_prefix, is_
             imwrite_ome(os.path.join(out_path, in_image.filename), mask, dim_order=dim_order)
     else:
         # points stored in a mask
+        data, dim_order, _ = imread(path)
         tracks, annotations = mask_convert(
-            imread(path), image, project_id,
+            data, image, project_id,
             mask_2d_fn=mask_to_points_2d,
             mask_3d_fn=lambda m: mask_to_points_3d(m, time=False, assume_unique_labels=False),
             track_prefix=track_prefix + "-object",
-            upload_group_id=upload_group_id
+            upload_group_id=get_dimensionality(dim_order) > 2
         )
 
     return tracks, annotations
 
 
-def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upload_group_id=False, **kwargs):
+def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, **kwargs):
     """
     Parameters:
     -----------
@@ -430,15 +428,15 @@ def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upl
     in_image: BiaflowsCytomineInput
     project_id: int
     name_prefix: str
-    upload_group_id: bool
     kwargs: dict
     """
 
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data = imread(path)
+    data, dim_order, _ = imread(path, return_order=True)
+    ndim = get_dimensionality(dim_order)
 
-    if data.ndim != 3:
+    if ndim != 3:
         raise ValueError("Annotation extraction for object tracking does not support masks with more than 3 dims...")
 
     slices = mask_to_points_3d(data, time=True, assume_unique_labels=True)
@@ -452,7 +450,7 @@ def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upl
             slice2point=lambda _slice: _slice.polygon,
             depth2slice=time_to_image, id_project=project_id,
             upload_object=False, track_prefix=track_prefix + "-particle",
-            upload_group_id=upload_group_id
+            upload_group_id=True
         )
         tracks.extend(curr_tracks)
         annotations.extend(curr_annots)
@@ -460,19 +458,18 @@ def extract_annotations_prttrk(out_path, in_image, project_id, track_prefix, upl
     return tracks, annotations
 
 
-def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, upload_group_id=False, **kwargs):
+def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, **kwargs):
     """
     out_path: str
     in_image: BiaflowsCytomineInput
     project_id: int
     track_prefix: str
-    upload_group_id: bool
     kwargs: dict
     """
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data, dimorder, _ = imread(path, return_order=True)
-    ndim = data.ndim - (1 if "C" in dimorder else 0)
+    data, dim_order, _ = imread(path, return_order=True)
+    ndim = get_dimensionality(dim_order)
 
     if ndim < 3:
         raise ValueError("Object tracking should be at least 3D (only {} spatial dimension(s) found)".format(ndim))
@@ -489,7 +486,7 @@ def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, upl
                 image, slice_group,
                 slice2point=lambda _slice: _slice.polygon.centroid,
                 depth2slice=time_to_image, id_project=project_id,
-                upload_object=True, upload_group_id=upload_group_id,
+                upload_object=True, upload_group_id=True,
                 track_prefix=track_prefix + "-object"
             )
             tracks.extend(curr_tracks)
@@ -501,11 +498,8 @@ def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, upl
         for time_steps in objects:
             label = time_steps[0][0].label
             track = Track(name="{}-{}".format(track_prefix, label), id_image=image.id,
-                          color=None if upload_group_id else DEFAULT_COLOR).save()
-
-            if upload_group_id:
-                Property(track, key="label", value=label).save()
-
+                          color=DEFAULT_COLOR).save()
+            Property(track, key="label", value=label).save()
             annotations.extend([
                 Annotation(
                     location=change_referential(p=slice.polygon, height=image.height).wkt,
@@ -524,7 +518,7 @@ def extract_annotations_objtrk(out_path, in_image, project_id, track_prefix, upl
     return tracks, annotations
 
 
-def extract_annotations_lootrc(out_path, in_image, project_id, track_prefix, upload_group_id=False, projection=0, **kwargs):
+def extract_annotations_lootrc(out_path, in_image, project_id, track_prefix, projection=0, **kwargs):
     """
     Parameters
     ----------
@@ -532,25 +526,24 @@ def extract_annotations_lootrc(out_path, in_image, project_id, track_prefix, upl
     in_image: BiaflowsCytomineInput
     project_id: int
     track_prefix: str
-    upload_group_id: bool
     projection: int
         Projection of the skeleton
     kwargs: dict
     """
     image = in_image.object
     path = os.path.join(out_path, in_image.filename)
-    data = imread(path)
+    data, dim_order, _ = imread(path, return_order=True)
     tracks, collection = mask_convert(
         data, image, project_id,
         mask_2d_fn=skeleton_mask_to_objects_2d,
         mask_3d_fn=lambda m: skeleton_mask_to_objects_3d(m, background=0, assume_unique_labels=True, projection=projection),
         track_prefix=track_prefix + "-network",
-        upload_group_id=upload_group_id
+        upload_group_id=get_dimensionality(dim_order) > 2
     )
     return tracks, collection
 
 
-def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=True, **kwargs):
+def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, **kwargs):
     """Upload annotations or any other related results to the server.
 
     Parameters
@@ -565,16 +558,17 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=T
         Output path
     monitor_params: dict|None
         A dictionnary of parameters to be passed to the data upload loop monitor.
-    is_2d: bool
-        True for 2D image, False for more than two dimensions.
     kwargs: dict
         Additional parameters for:
         * ObjDet/SptCnt: see function 'extract_annotations_objdet'
         * ObjSeg: see function 'extract_annotations_objseg'
     """
+    if "is_2d" in kwargs:
+        warnings.warn("As of version 0.9.3, the 'is_2d' parameter is not needed anymore in function 'upload_data' and "
+                      "is now ignored.", DeprecationWarning)
     if not nj.flags["do_upload_annotations"]:
         return
-    if nj.flags["tiling"] and ((problemclass != CLASS_OBJSEG and problemclass != CLASS_PIXCLA) or not is_2d):
+    if nj.flags["tiling"] and (problemclass != CLASS_OBJSEG and problemclass != CLASS_PIXCLA):
         print("Annot. upload is only supported for one of {ObjSeg, PixCla} in 2D when tiling is enabled.. skipping !")
         return
     if monitor_params is None:
@@ -600,16 +594,12 @@ def upload_data(problemclass, nj, inputs, out_path, monitor_params=None, is_2d=T
         else:
             raise NotImplementedError("Upload data does not support problem class '{}' yet.".format(problemclass))
 
-        # whether or not to upload a unique identifier as a property with each detected object
-        upload_group_id = not is_2d or problemclass in {CLASS_OBJTRK, CLASS_PRTTRK}
-
         tracks = TrackCollection()
         monitor_params["prefix"] = "Extract masks/points/... from output data"
         for in_image in nj.monitor(inputs, **monitor_params):
             curr_tracks, curr_annots = extract_fn(
                 out_path, in_image, nj.project.id,
                 track_prefix=str(nj.job.id),
-                upload_group_id=upload_group_id,
                 **kwargs
             )
             tracks.extend(curr_tracks)
