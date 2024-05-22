@@ -10,15 +10,17 @@ with open("README.md", "r") as fh:
 
 if sys.version_info[0] == 3:
     packages = [
-        'rasterio>=1.1.0', 'scipy>=1.0,<=1.2', 'tifffile>=2020', 'scikit-image>=0.14.0,<=0.14.2', 'scikit-learn>=0.17,<=0.20.2',
-        'pandas>=0.20,<=0.24.1', 'numpy>=0.15.4', 'opencv-python-headless>=4,<=4.0.0.21',
-        'shapely>=1.6,<=1.7a1', 'skan>=0.8,<=0.8.1', 'numba>=0.49.1,<=0.50.1', 'sldc>=1.1.2'
-    ]
-else:
-    # TODO make a version for python 2.7
-    packages = [
-        'scipy', 'tifffile', 'scikit-image', 'scikit-learn', 'pandas',
-        'numpy', 'opencv-python-headless', 'shapely', 'skan', 'numba', 'sldc'
+        'scipy==1.9.0',
+        'tifffile==2023.7.10',
+        'scikit-image==0.21.0',
+        'scikit-learn==0.24.2',
+        'pandas==2.0.3',
+        'numpy==1.24.4',
+        'opencv-python-headless==4.9.0.80',
+        'shapely==2.0.4',
+        'skan==0.11.1',
+        'numba==0.58.1',
+        'sldc==1.4.2'
     ]
 
 
@@ -30,7 +32,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=['biaflows', 'biaflows.exporter', 'biaflows.metrics', 'biaflows.helpers'],
-    url='https://github.com/biaflows',
+    url='https://github.com/TorecLuik/biaflows-utilities',
     classifiers=[
         'Intended Audience :: Science/Research',
         'Intended Audience :: Developers',
@@ -41,10 +43,8 @@ setup(
         'Operating System :: POSIX',
         'Operating System :: Unix',
         'Operating System :: MacOS',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7'
+        'Programming Language :: Python :: 3.8'
     ],
     install_requires=packages,
     license='LICENSE'
 )
-
